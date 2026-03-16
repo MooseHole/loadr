@@ -740,6 +740,83 @@
     opacity: 0.5;
   }
   .dimmed { opacity: 0.35; pointer-events: none; }
+
+  /* ── APPEARANCE PREVIEW ── */
+  #appearance-preview {
+    margin-top: 14px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    height: 130px;
+    position: relative;
+    overflow: hidden;
+  }
+  #preview-bg {
+    position: absolute; inset: 0;
+  }
+  #preview-overlay {
+    position: absolute; inset: 0;
+    background: rgba(0,0,0,0.45);
+  }
+  #preview-content {
+    position: relative; z-index: 2;
+    height: 100%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 8px;
+    padding: 12px;
+  }
+  #preview-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+  }
+  #preview-spinner {
+    transform: scale(0.55);
+    transform-origin: center;
+    height: 28px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  #preview-bar-track {
+    width: 80%; height: 3px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  #preview-bar {
+    height: 100%; width: 67%;
+    border-radius: 2px;
+  }
+  #preview-pct {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    opacity: 0.7;
+  }
+  #preview-remaining {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    opacity: 0.55;
+  }
+  /* preview bg pattern classes mirror the real ones */
+  #preview-bg.bg-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+    background-size: 20px 20px;
+  }
+  #preview-bg.bg-scanlines {
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.55) 0px, rgba(0,0,0,0.55) 1px,
+      transparent 1px, transparent 3px
+    );
+  }
+  #preview-bg.bg-gradient-overlay {
+    background-image: radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.85) 100%);
+  }
 </style>
 <body>
 
@@ -786,18 +863,19 @@
     <!-- APPEARANCE -->
     <div class="cfg-section">
       <div class="section-title">🎨 Appearance</div>
-      <label>Title Text</label>
-      <input type="text" id="title-text" value="LOADING" maxlength="40">
       <label>Accent Color</label>
-      <div class="color-row" id="color-swatches">
-        <div class="color-swatch active" data-color="#39ff14" style="background:#39ff14" title="Matrix Green"></div>
-        <div class="color-swatch" data-color="#00d4ff" style="background:#00d4ff" title="Cyan"></div>
-        <div class="color-swatch" data-color="#ff6b35" style="background:#ff6b35" title="Ember"></div>
-        <div class="color-swatch" data-color="#c084fc" style="background:#c084fc" title="Violet"></div>
-        <div class="color-swatch" data-color="#fb923c" style="background:#fb923c" title="Amber"></div>
-        <div class="color-swatch" data-color="#f43f5e" style="background:#f43f5e" title="Rose"></div>
-        <div class="color-swatch" data-color="#ffffff" style="background:#ffffff" title="White"></div>
-        <div class="color-swatch" data-color="#facc15" style="background:#facc15" title="Gold"></div>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <input type="color" id="accent-color-picker" value="#39ff14" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);background:var(--input-bg);border-radius:3px;cursor:pointer;flex-shrink:0">
+        <div class="color-row" id="color-swatches" style="margin:0;flex-wrap:wrap;gap:6px">
+          <div class="color-swatch active" data-color="#39ff14" style="background:#39ff14" title="Matrix Green"></div>
+          <div class="color-swatch" data-color="#00d4ff" style="background:#00d4ff" title="Cyan"></div>
+          <div class="color-swatch" data-color="#ff6b35" style="background:#ff6b35" title="Ember"></div>
+          <div class="color-swatch" data-color="#c084fc" style="background:#c084fc" title="Violet"></div>
+          <div class="color-swatch" data-color="#fb923c" style="background:#fb923c" title="Amber"></div>
+          <div class="color-swatch" data-color="#f43f5e" style="background:#f43f5e" title="Rose"></div>
+          <div class="color-swatch" data-color="#ffffff" style="background:#ffffff" title="White"></div>
+          <div class="color-swatch" data-color="#facc15" style="background:#facc15" title="Gold"></div>
+        </div>
       </div>
       <label>Background Style</label>
       <select id="bg-style">
@@ -841,6 +919,17 @@
         <label class="toggle"><input type="checkbox" id="glitch-effect"><span class="toggle-slider"></span></label>
         <span class="toggle-label">Glitch effect</span>
       </div>
+      <div id="appearance-preview">
+        <div id="preview-bg"></div>
+        <div id="preview-overlay"></div>
+        <div id="preview-content">
+          <div id="preview-title"></div>
+          <div id="preview-spinner"></div>
+          <div id="preview-bar-track"><div id="preview-bar"></div></div>
+          <div id="preview-pct">67%</div>
+          <div id="preview-remaining">3m 12s remaining</div>
+        </div>
+      </div>
     </div>
 
     <!-- SPINNER TYPE -->
@@ -852,15 +941,21 @@
     <!-- MESSAGES -->
     <div class="cfg-section">
       <div class="section-title">💬 Status Messages</div>
+      <label>Title Text</label>
+      <input type="text" id="title-text" value="LOADING" maxlength="40">
+      <label>Status messages</label>
       <div id="msg-tags"></div>
       <div class="msg-add-row">
         <input type="text" id="msg-input" placeholder="Type a message and press +" maxlength="80">
         <button id="msg-add-btn">+</button>
+        <button id="msg-clear-btn" title="Remove all messages" style="background:rgba(255,59,59,0.12);border-color:rgba(255,59,59,0.3);color:#ff3b3b">✕</button>
       </div>
       <div class="toggle-row" style="margin-top:10px">
         <label class="toggle"><input type="checkbox" id="shuffle-msgs" checked><span class="toggle-slider"></span></label>
         <span class="toggle-label">Rotate messages during load</span>
       </div>
+      <label style="margin-top:10px">Completion message</label>
+      <input type="text" id="complete-msg" value="✓ Complete" maxlength="80">
     </div>
 
     <!-- IMAGES -->
@@ -1043,6 +1138,7 @@ function initSpinnerGrid() {
       selectedSpinner = sp.id;
       document.querySelectorAll('.spinner-card').forEach(c => c.classList.remove('selected'));
       card.classList.add('selected');
+      updatePreview();
     });
     grid.appendChild(card);
   });
@@ -1134,11 +1230,83 @@ updateChunkyDemo();
 document.getElementById('color-swatches').addEventListener('click', e => {
   const swatch = e.target.closest('.color-swatch');
   if (!swatch) return;
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('#color-swatches .color-swatch').forEach(s => s.classList.remove('active'));
   swatch.classList.add('active');
   selectedColor = swatch.dataset.color;
+  document.getElementById('accent-color-picker').value = selectedColor;
   document.querySelectorAll('.spinner-card').forEach(c => c.style.color = selectedColor);
+  updatePreview();
 });
+document.getElementById('accent-color-picker').addEventListener('input', function() {
+  document.querySelectorAll('#color-swatches .color-swatch').forEach(s => s.classList.remove('active'));
+  selectedColor = this.value;
+  document.querySelectorAll('.spinner-card').forEach(c => c.style.color = selectedColor);
+  updatePreview();
+});
+
+// ── APPEARANCE PREVIEW ──
+function updatePreview() {
+  const bgStyle = document.getElementById('bg-style').value;
+  const bgColor = document.getElementById('bg-color').value;
+  const titleText = document.getElementById('title-text').value || 'LOADING';
+  const showBar = document.getElementById('show-bar').checked;
+  const showPct = document.getElementById('show-percent').checked;
+  const showSpinner = document.getElementById('show-spinner').checked;
+  const glitch = document.getElementById('glitch-effect').checked;
+  const color = selectedColor;
+
+  // Background
+  const previewBg = document.getElementById('preview-bg');
+  previewBg.className = '';
+  previewBg.style.cssText = '';
+  previewBg.style.backgroundColor = bgColor;
+  if (bgStyle === 'grid') previewBg.classList.add('bg-grid');
+  else if (bgStyle === 'scanlines') previewBg.classList.add('bg-scanlines');
+  else if (bgStyle === 'gradient') previewBg.classList.add('bg-gradient-overlay');
+
+  // Overlay — hide if image mode so bg color shows through
+  document.getElementById('preview-overlay').style.display = bgStyle === 'image' ? 'none' : 'block';
+
+  // Title
+  const titleEl = document.getElementById('preview-title');
+  titleEl.style.color = color;
+  titleEl.style.textShadow = `0 0 16px ${color}66`;
+  if (glitch) {
+    titleEl.innerHTML = `<div class="glitch-wrap" data-text="${titleText}" style="font-family:inherit;font-size:inherit;font-weight:inherit;letter-spacing:inherit;text-align:center">${titleText}</div>`;
+  } else {
+    titleEl.textContent = titleText;
+  }
+
+  // Spinner
+  const spEl = document.getElementById('preview-spinner');
+  spEl.style.color = color;
+  if (showSpinner) {
+    const sp = SPINNERS.find(s => s.id === selectedSpinner) || SPINNERS[0];
+    spEl.innerHTML = sp.html();
+    spEl.style.display = 'flex';
+  } else {
+    spEl.innerHTML = '';
+    spEl.style.display = 'none';
+  }
+
+  // Bar
+  const barTrack = document.getElementById('preview-bar-track');
+  const bar = document.getElementById('preview-bar');
+  barTrack.style.display = showBar ? 'block' : 'none';
+  bar.style.background = color;
+  bar.style.boxShadow = `0 0 6px ${color}88`;
+
+  // Pct
+  const pctEl = document.getElementById('preview-pct');
+  pctEl.style.color = color;
+  pctEl.style.display = showPct ? 'block' : 'none';
+
+  // Remaining
+  const showRemaining = document.getElementById('show-remaining').checked;
+  const remEl = document.getElementById('preview-remaining');
+  remEl.style.color = color;
+  remEl.style.display = showRemaining ? 'block' : 'none';
+}
 
 // ── MESSAGES ──
 function renderMsgTags() {
@@ -1160,6 +1328,7 @@ function renderMsgTags() {
 renderMsgTags();
 
 document.getElementById('msg-add-btn').addEventListener('click', addMessage);
+document.getElementById('msg-clear-btn').addEventListener('click', () => { messages = []; renderMsgTags(); });
 document.getElementById('msg-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') addMessage();
 });
@@ -1192,6 +1361,11 @@ function handleFiles(files) {
     reader.onload = ev => {
       images.push(ev.target.result);
       renderImageList();
+      // Auto-switch to slideshow mode on first image added
+      if (images.length === 1) {
+        document.getElementById('bg-style').value = 'image';
+        updatePreview();
+      }
     };
     reader.readAsDataURL(f);
   });
@@ -1249,9 +1423,11 @@ document.getElementById('bg-presets').addEventListener('click', e => {
   document.querySelectorAll('#bg-presets .color-swatch').forEach(s => s.classList.remove('active'));
   swatch.classList.add('active');
   document.getElementById('bg-color').value = swatch.dataset.color;
+  updatePreview();
 });
 document.getElementById('bg-color').addEventListener('input', function() {
   document.querySelectorAll('#bg-presets .color-swatch').forEach(s => s.classList.remove('active'));
+  updatePreview();
 });
 
 // ── BG STYLE ──
@@ -1259,7 +1435,14 @@ document.getElementById('bg-style').addEventListener('change', function() {
   if (this.value === 'image') {
     document.getElementById('drop-zone').scrollIntoView({behavior:'smooth', block:'nearest'});
   }
+  updatePreview();
 });
+
+// Hook toggles and title into preview
+['show-bar','show-percent','show-remaining','show-spinner','glitch-effect'].forEach(id => {
+  document.getElementById(id).addEventListener('change', updatePreview);
+});
+document.getElementById('title-text').addEventListener('input', updatePreview);
 
 // ── LAUNCH ──
 document.getElementById('launch-btn').addEventListener('click', launchLoader);
@@ -1293,6 +1476,7 @@ function getConfig() {
     bgColor: document.getElementById('bg-color').value,
     messages: [...messages],
     shuffleMsgs: document.getElementById('shuffle-msgs').checked,
+    completeMsg: document.getElementById('complete-msg').value.trim() || 'Complete',
     images: [...images],
     slideInterval: parseInt(document.getElementById('slide-interval').value) * 1000,
   };
@@ -1457,7 +1641,19 @@ function runLoader(cfg) {
       bar.style.width = '100%';
       pct.textContent = '100%';
       rem.textContent = '';
-      msgEl.textContent = '✓ Complete';
+      msgEl.style.opacity = '0';
+      if (messageTimer) { clearInterval(messageTimer); messageTimer = null; }
+      // Replace title with completion message, hide spinner
+      document.getElementById('loader-title').textContent = cfg.completeMsg;
+      document.getElementById('spinner-container').innerHTML = '';
+      // Revert to solid background if slideshow was running
+      if (cfg.bgStyle === 'image') {
+        if (slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+        const layer1 = document.getElementById('loader-bg-image');
+        const layer2 = document.getElementById('loader-bg-image2');
+        layer1.style.opacity = '0';
+        layer2.style.opacity = '0';
+      }
       setTimeout(() => { dismiss.classList.add('visible'); }, 500);
     }
   }
@@ -1500,9 +1696,11 @@ function resetConfig() {
   document.getElementById('bg-color').value = '#000000';
   document.querySelectorAll('#bg-presets .color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === '#000000'));
   document.getElementById('shuffle-msgs').checked = true;
+  document.getElementById('complete-msg').value = '✓ Complete';
   selectedSpinner = 'ring';
   selectedColor = '#39ff14';
-  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === '#39ff14'));
+  document.getElementById('accent-color-picker').value = '#39ff14';
+  document.querySelectorAll('#color-swatches .color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === '#39ff14'));
   messages = [
     'Initializing core systems...',
     'Loading assets...',
@@ -1515,10 +1713,12 @@ function resetConfig() {
   renderImageList();
   initSpinnerGrid();
   updateChunkyDemo();
+  updatePreview();
 }
 
 // ── INIT ──
 initSpinnerGrid();
+updatePreview();
 </script>
 </body>
 </html>
