@@ -426,6 +426,13 @@
     opacity: 0.7;
   }
 
+  #remaining-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    opacity: 0.55;
+  }
+
   #status-message {
     font-family: 'Share Tech Mono', monospace;
     font-size: clamp(11px, 2.5vw, 14px);
@@ -457,6 +464,26 @@
     border-color: rgba(255,255,255,0.4);
   }
   #loader-dismiss.visible { display: block; }
+
+  #fs-btn-loader {
+    position: fixed;
+    bottom: 16px; right: 16px;
+    z-index: 20;
+    background: rgba(255,255,255,0.07);
+    border: 1px solid rgba(255,255,255,0.15);
+    color: rgba(255,255,255,0.4);
+    font-size: 20px;
+    width: 36px; height: 36px;
+    border-radius: 4px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: color 0.2s, background 0.2s;
+    line-height: 1;
+  }
+  #fs-btn-loader:hover {
+    color: rgba(255,255,255,0.85);
+    background: rgba(255,255,255,0.14);
+  }
 
   /* ── SPINNERS ── */
   .sp-ring {
@@ -739,10 +766,14 @@
         <label class="toggle"><input type="checkbox" id="infinite-mode"><span class="toggle-slider"></span></label>
         <span class="toggle-label">Infinite (no progress or %)</span>
       </div>
-      <label>Duration (seconds)</label>
+      <label id="duration-label">Duration</label>
       <div class="range-row" id="duration-row">
-        <input type="range" id="duration" min="2" max="60" value="8" step="1">
+        <input type="range" id="duration" min="1" max="3600" value="8" step="1">
         <span class="range-val" id="duration-val">8s</span>
+      </div>
+      <div class="msg-add-row" id="duration-custom-row" style="margin-bottom:12px">
+        <input type="text" id="duration-custom" placeholder="Custom: 90  or  1:30  or  1h30m" style="margin:0;flex:1;font-size:11px">
+        <button id="duration-custom-btn" title="Apply">✓</button>
       </div>
       <label>Speed variance — Chunkiness</label>
       <div class="range-row">
@@ -793,6 +824,10 @@
       <div class="toggle-row">
         <label class="toggle"><input type="checkbox" id="show-percent" checked><span class="toggle-slider"></span></label>
         <span class="toggle-label">Show percentage</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="show-remaining"><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Show time remaining</span>
       </div>
       <div class="toggle-row">
         <label class="toggle"><input type="checkbox" id="show-bar" checked><span class="toggle-slider"></span></label>
@@ -848,6 +883,7 @@
   <div class="cfg-footer">
     <button class="btn btn-primary" id="launch-btn">▶ LAUNCH SIMULATION</button>
     <button class="btn btn-ghost" id="reset-btn">RESET</button>
+    <button class="btn btn-ghost" id="fs-btn-cfg" title="Toggle fullscreen" style="margin-left:auto;padding:10px 14px;font-size:14px">⛶</button>
   </div>
 </div>
 
@@ -866,8 +902,10 @@
       <div id="progress-bar"></div>
     </div>
     <div id="progress-label"></div>
+    <div id="remaining-label"></div>
     <div id="status-message"></div>
     <button id="loader-dismiss">◀ BACK TO CONFIG</button>
+    <button id="fs-btn-loader" title="Toggle fullscreen">⛶</button>
   </div>
 </div>
 
@@ -1016,17 +1054,54 @@ function linkRange(id, valId, suffix) {
   const val = document.getElementById(valId);
   el.addEventListener('input', () => { val.textContent = el.value + suffix; });
 }
-linkRange('duration', 'duration-val', 's');
-linkRange('slide-interval', 'slide-val', 's');
+function formatDuration(s) {
+  s = Math.round(s);
+  if (s < 60) return s + 's';
+  if (s < 3600) { const m = Math.floor(s/60), sec = s%60; return sec ? m+'m '+sec+'s' : m+'m'; }
+  if (s < 86400) { const h = Math.floor(s/3600), m = Math.floor((s%3600)/60); return m ? h+'h '+m+'m' : h+'h'; }
+  const d = Math.floor(s/86400), h = Math.floor((s%86400)/3600);
+  return h ? d+'d '+h+'h' : d+'d';
+}
+function parseDuration(str) {
+  str = str.trim().toLowerCase();
+  // hh:mm:ss or mm:ss
+  if (/^\d+:\d+(:\d+)?$/.test(str)) {
+    const parts = str.split(':').map(Number);
+    if (parts.length === 2) return parts[0] * 60 + parts[1];
+    return parts[0] * 3600 + parts[1] * 60 + parts[2];
+  }
+  // 1h30m, 2h, 45m, etc.
+  let total = 0;
+  const d = str.match(/(\d+)\s*d/); if (d) total += parseInt(d[1]) * 86400;
+  const h = str.match(/(\d+)\s*h/); if (h) total += parseInt(h[1]) * 3600;
+  const m = str.match(/(\d+)\s*m/); if (m) total += parseInt(m[1]) * 60;
+  const s = str.match(/(\d+)\s*s/); if (s) total += parseInt(s[1]);
+  if (total > 0) return total;
+  // plain number = seconds
+  const n = parseFloat(str);
+  return isNaN(n) ? null : Math.round(n);
+}
+let customDurationSecs = null; // set when user manually enters a value
 
-// ── INFINITE MODE TOGGLE ──
-document.getElementById('infinite-mode').addEventListener('change', function() {
-  const durationRow = document.getElementById('duration-row');
-  const durationLabel = durationRow.previousElementSibling;
-  const dimmed = this.checked;
-  durationRow.classList.toggle('dimmed', dimmed);
-  durationLabel.classList.toggle('dimmed', dimmed);
+document.getElementById('duration').addEventListener('input', function() {
+  customDurationSecs = null; // slider moved, discard custom value
+  document.getElementById('duration-val').textContent = formatDuration(this.value);
 });
+// Custom duration input
+function applyCustomDuration() {
+  const raw = document.getElementById('duration-custom').value;
+  const secs = parseDuration(raw);
+  if (!secs || secs < 1) return;
+  customDurationSecs = secs;
+  // Sync slider if within range, otherwise just show the label
+  document.getElementById('duration').value = Math.min(secs, 3600);
+  document.getElementById('duration-val').textContent = formatDuration(secs);
+  document.getElementById('duration-custom').value = '';
+}
+document.getElementById('duration-custom-btn').addEventListener('click', applyCustomDuration);
+document.getElementById('duration-custom').addEventListener('keydown', e => { if (e.key === 'Enter') applyCustomDuration(); });
+
+linkRange('slide-interval', 'slide-val', 's');
 
 document.getElementById('chunky').addEventListener('input', function() {
   document.getElementById('chunky-val').textContent = this.value;
@@ -1137,11 +1212,31 @@ function renderImageList() {
   });
 }
 
+// ── FULLSCREEN ──
+function toggleFullscreen() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen().catch(() => {});
+  } else {
+    document.exitFullscreen().catch(() => {});
+  }
+}
+function updateFsIcons() {
+  const inFs = !!document.fullscreenElement;
+  document.getElementById('fs-btn-cfg').textContent    = inFs ? '⊡' : '⛶';
+  document.getElementById('fs-btn-loader').textContent = inFs ? '⊡' : '⛶';
+}
+document.getElementById('fs-btn-cfg').addEventListener('click', toggleFullscreen);
+document.getElementById('fs-btn-loader').addEventListener('click', toggleFullscreen);
+document.addEventListener('fullscreenchange', updateFsIcons);
+
 // ── INFINITE MODE TOGGLE ──
 function updateInfiniteUI() {
   const on = document.getElementById('infinite-mode').checked;
   document.getElementById('duration-row').classList.toggle('dimmed', on);
+  document.getElementById('duration-custom-row').classList.toggle('dimmed', on);
+  document.getElementById('duration-label').classList.toggle('dimmed', on);
   document.getElementById('show-percent').closest('.toggle-row').classList.toggle('dimmed', on);
+  document.getElementById('show-remaining').closest('.toggle-row').classList.toggle('dimmed', on);
   document.getElementById('show-bar').closest('.toggle-row').classList.toggle('dimmed', on);
 }
 document.getElementById('infinite-mode').addEventListener('change', updateInfiniteUI);
@@ -1183,11 +1278,12 @@ function launchLoader() {
 function getConfig() {
   const infinite = document.getElementById('infinite-mode').checked;
   return {
-    duration: parseInt(document.getElementById('duration').value) * 1000,
+    duration: (customDurationSecs !== null ? customDurationSecs : parseInt(document.getElementById('duration').value)) * 1000,
     infinite,
     chunky: parseInt(document.getElementById('chunky').value),
     title: document.getElementById('title-text').value || 'LOADING',
     showPercent: infinite ? false : document.getElementById('show-percent').checked,
+    showRemaining: infinite ? false : document.getElementById('show-remaining').checked,
     showBar: infinite ? false : document.getElementById('show-bar').checked,
     showSpinner: document.getElementById('show-spinner').checked,
     glitch: document.getElementById('glitch-effect').checked,
@@ -1239,6 +1335,12 @@ function applyConfig(cfg) {
   pct.style.color = cfg.color;
   pct.style.display = cfg.showPercent ? 'block' : 'none';
 
+  // Remaining label
+  const rem = document.getElementById('remaining-label');
+  rem.style.color = cfg.color;
+  rem.style.display = cfg.showRemaining ? 'block' : 'none';
+  rem.textContent = '';
+
   // Status message color
   document.getElementById('status-message').style.color = cfg.color;
 
@@ -1258,6 +1360,7 @@ function runLoader(cfg) {
   const startTime = Date.now();
   const bar = document.getElementById('progress-bar');
   const pct = document.getElementById('progress-label');
+  const rem = document.getElementById('remaining-label');
   const msgEl = document.getElementById('status-message');
   const dismiss = document.getElementById('loader-dismiss');
 
@@ -1343,12 +1446,17 @@ function runLoader(cfg) {
 
     bar.style.width = progress.toFixed(1) + '%';
     pct.textContent = Math.floor(progress) + '%';
+    if (cfg.showRemaining && progress > 0) {
+      const secsLeft = Math.round((cfg.duration / 1000) * (1 - progress / 100));
+      rem.textContent = secsLeft > 0 ? formatDuration(secsLeft) + ' remaining' : '';
+    }
 
     if (progress < 100) {
       loaderTimer = requestAnimationFrame(tick);
     } else {
       bar.style.width = '100%';
       pct.textContent = '100%';
+      rem.textContent = '';
       msgEl.textContent = '✓ Complete';
       setTimeout(() => { dismiss.classList.add('visible'); }, 500);
     }
@@ -1376,12 +1484,15 @@ function stopLoader() {
 function resetConfig() {
   document.getElementById('infinite-mode').checked = false;
   updateInfiniteUI();
+  customDurationSecs = null;
   document.getElementById('duration').value = 8;
-  document.getElementById('duration-val').textContent = '8s';
+  document.getElementById('duration-val').textContent = formatDuration(8);
+  document.getElementById('duration-custom').value = '';
   document.getElementById('chunky').value = 3;
   document.getElementById('chunky-val').textContent = '3';
   document.getElementById('title-text').value = 'LOADING';
   document.getElementById('show-percent').checked = true;
+  document.getElementById('show-remaining').checked = false;
   document.getElementById('show-bar').checked = true;
   document.getElementById('show-spinner').checked = true;
   document.getElementById('glitch-effect').checked = false;
