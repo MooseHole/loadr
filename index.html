@@ -1641,7 +1641,7 @@ function runLoader(cfg) {
       bar.style.width = '100%';
       pct.textContent = '100%';
       rem.textContent = '';
-      msgEl.style.opacity = '0';
+      msgEl.style.display = 'none';
       if (messageTimer) { clearInterval(messageTimer); messageTimer = null; }
       // Replace title with completion message, hide spinner
       document.getElementById('loader-title').textContent = cfg.completeMsg;
@@ -1670,6 +1670,8 @@ function stopLoader() {
   loader.classList.remove('active');
   document.getElementById('loader-dismiss').classList.remove('visible');
   document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('status-message').style.display = '';
+  document.getElementById('status-message').style.opacity = '1';
   document.getElementById('loader-bg-image').style.opacity = '0';
   document.getElementById('loader-bg-image').style.backgroundImage = '';
   document.getElementById('loader-bg-image2').style.opacity = '0';
