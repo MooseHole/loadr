@@ -1,1 +1,1 @@
-"# loadr" 
+This is just some vibe coded slop.  The idea is that you can show a loading screen before a presentation or something.

@@ -1,0 +1,1413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>LOADR — Loading Screen Simulator</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+
+  :root {
+    --bg: #0a0a0a;
+    --panel-bg: #111114;
+    --border: #2a2a2f;
+    --accent: #39ff14;
+    --accent2: #00d4ff;
+    --accent3: #ff6b35;
+    --text: #c8c8c8;
+    --text-dim: #555;
+    --text-bright: #f0f0f0;
+    --input-bg: #0d0d10;
+    --danger: #ff3b3b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    overflow: hidden;
+  }
+
+  /* ── CONFIGURATOR ── */
+  #configurator {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column;
+    background: var(--bg);
+    z-index: 100;
+    transition: transform 0.6s cubic-bezier(0.77,0,0.175,1), opacity 0.4s;
+  }
+  #configurator.hidden {
+    transform: translateY(-100%);
+    opacity: 0;
+    pointer-events: none;
+  }
+
+  .cfg-header {
+    padding: 18px 24px 14px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 16px;
+    flex-shrink: 0;
+  }
+  .cfg-header h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(14px, 3vw, 22px);
+    font-weight: 900;
+    letter-spacing: 0.2em;
+    color: var(--accent);
+    text-shadow: 0 0 20px rgba(57,255,20,0.4);
+  }
+  .cfg-header .sub {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    margin-top: 2px;
+  }
+  .cfg-header .dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 8px var(--accent);
+    animation: pulse 1.5s ease-in-out infinite;
+  }
+  .kofi-btn {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #FF5E5B;
+    color: #fff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 7px 13px;
+    border-radius: 20px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: filter 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+  .kofi-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .kofi-btn svg { flex-shrink: 0; }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .cfg-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 24px;
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 20px;
+    align-content: start;
+  }
+  .cfg-body::-webkit-scrollbar { width: 4px; }
+  .cfg-body::-webkit-scrollbar-track { background: transparent; }
+  .cfg-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  .cfg-section {
+    background: var(--panel-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 16px;
+  }
+  .cfg-section.wide { grid-column: 1 / -1; }
+
+  .section-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    color: var(--accent);
+    margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+
+  label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+    text-transform: uppercase;
+  }
+
+  input[type="text"], input[type="number"], select, textarea {
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    color: var(--text-bright);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    padding: 7px 10px;
+    outline: none;
+    transition: border-color 0.2s;
+    margin-bottom: 12px;
+  }
+  input[type="text"]:focus, input[type="number"]:focus,
+  select:focus, textarea:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 1px rgba(57,255,20,0.15);
+  }
+  textarea { resize: vertical; min-height: 70px; }
+  select option { background: #1a1a1f; }
+
+  .range-row {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 12px;
+  }
+  .range-row input[type="range"] {
+    flex: 1; margin: 0;
+    -webkit-appearance: none;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    border: none;
+    padding: 0;
+  }
+  .range-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    border-radius: 50%;
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+    cursor: pointer;
+  }
+  .range-val {
+    font-size: 11px;
+    color: var(--accent);
+    min-width: 36px;
+    text-align: right;
+  }
+
+  .color-row {
+    display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px;
+  }
+  .color-swatch {
+    width: 28px; height: 28px;
+    border-radius: 3px;
+    border: 2px solid transparent;
+    cursor: pointer;
+    transition: transform 0.15s, border-color 0.15s;
+    position: relative;
+  }
+  .color-swatch:hover { transform: scale(1.15); }
+  .color-swatch.active { border-color: white; }
+
+  .toggle-row {
+    display: flex; align-items: center; gap: 10px; margin-bottom: 12px;
+  }
+  .toggle {
+    position: relative; width: 36px; height: 20px; flex-shrink: 0;
+  }
+  .toggle input { opacity: 0; width: 0; height: 0; }
+  .toggle-slider {
+    position: absolute; inset: 0;
+    background: var(--border);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .toggle-slider::after {
+    content: '';
+    position: absolute;
+    width: 14px; height: 14px;
+    top: 3px; left: 3px;
+    background: var(--text-dim);
+    border-radius: 50%;
+    transition: transform 0.2s, background 0.2s;
+  }
+  .toggle input:checked + .toggle-slider { background: rgba(57,255,20,0.3); }
+  .toggle input:checked + .toggle-slider::after {
+    transform: translateX(16px);
+    background: var(--accent);
+    box-shadow: 0 0 6px var(--accent);
+  }
+  .toggle-label { font-size: 11px; color: var(--text); }
+
+  /* spinner preview grid */
+  .spinner-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 10px;
+  }
+  .spinner-card {
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 6px;
+    display: flex; flex-direction: column; align-items: center; gap: 8px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+  }
+  .spinner-card:hover { background: rgba(57,255,20,0.05); border-color: #444; }
+  .spinner-card.selected {
+    border-color: var(--accent);
+    background: rgba(57,255,20,0.08);
+  }
+  .spinner-card .sp-name { font-size: 9px; letter-spacing: 0.08em; color: var(--text-dim); text-align: center; }
+
+  /* mini spinners for preview */
+  .mini-sp { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; }
+
+  .cfg-footer {
+    padding: 14px 24px;
+    border-top: 1px solid var(--border);
+    display: flex; gap: 12px; align-items: center; flex-shrink: 0;
+  }
+
+  .btn {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    padding: 10px 24px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+  }
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    font-weight: 700;
+    box-shadow: 0 0 16px rgba(57,255,20,0.3);
+  }
+  .btn-primary:hover {
+    box-shadow: 0 0 28px rgba(57,255,20,0.6);
+    transform: translateY(-1px);
+  }
+  .btn-ghost {
+    background: transparent;
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+  }
+  .btn-ghost:hover { border-color: #555; color: var(--text); }
+
+  /* image upload area */
+  .drop-zone {
+    border: 1px dashed var(--border);
+    border-radius: 4px;
+    padding: 14px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: border-color 0.2s, color 0.2s;
+    margin-bottom: 10px;
+  }
+  .drop-zone:hover, .drop-zone.dragover {
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .img-list { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+  .img-thumb {
+    width: 56px; height: 40px;
+    object-fit: cover;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    position: relative;
+  }
+  .img-thumb-wrap {
+    position: relative; display: inline-block;
+    cursor: pointer;
+  }
+  .img-thumb-wrap .rm {
+    position: absolute; top: -5px; right: -5px;
+    width: 14px; height: 14px;
+    background: var(--danger);
+    border-radius: 50%;
+    font-size: 9px;
+    display: flex; align-items: center; justify-content: center;
+    color: white; font-weight: bold;
+    line-height: 1;
+  }
+
+  /* ── LOADING SCREEN ── */
+  #loader {
+    position: fixed; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    z-index: 50;
+    opacity: 0;
+    transition: opacity 0.5s;
+    pointer-events: none;
+    overflow: hidden;
+  }
+  #loader.active {
+    opacity: 1;
+    pointer-events: all;
+  }
+
+  #loader-bg {
+    position: absolute; inset: 0;
+    z-index: 0;
+  }
+  #loader-bg-image {
+    position: absolute; inset: 0;
+    background-size: cover; background-position: center;
+    z-index: 1;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+  /* second image layer for crossfade */
+  #loader-bg-image2 {
+    position: absolute; inset: 0;
+    background-size: cover; background-position: center;
+    z-index: 2;
+    opacity: 0;
+    transition: opacity 0.8s ease;
+  }
+  #loader-bg-overlay {
+    position: absolute; inset: 0;
+    z-index: 3;
+    background: rgba(0,0,0,0.45);
+  }
+  #loader-noise {
+    position: absolute; inset: 0;
+    z-index: 4;
+    opacity: 0.035;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    background-size: 150px;
+    pointer-events: none;
+  }
+
+  #loader-content {
+    position: relative; z-index: 10;
+    display: flex; flex-direction: column; align-items: center;
+    gap: 28px;
+    width: min(500px, 90vw);
+    padding: 40px 20px;
+  }
+
+  #loader-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(18px, 5vw, 36px);
+    font-weight: 900;
+    letter-spacing: 0.25em;
+    text-align: center;
+    text-transform: uppercase;
+  }
+
+  #spinner-container {
+    width: 72px; height: 72px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  #progress-track {
+    width: 100%;
+    height: 4px;
+    background: rgba(255,255,255,0.12);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+  }
+  #progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: 2px;
+    transition: width 0.1s;
+    position: relative;
+  }
+  #progress-bar::after {
+    content: '';
+    position: absolute;
+    right: 0; top: 0; bottom: 0;
+    width: 20px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.6));
+    border-radius: 2px;
+  }
+
+  #progress-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    letter-spacing: 0.12em;
+    opacity: 0.7;
+  }
+
+  #status-message {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: clamp(11px, 2.5vw, 14px);
+    letter-spacing: 0.08em;
+    text-align: center;
+    opacity: 0.65;
+    min-height: 1.4em;
+    transition: opacity 0.3s;
+    padding: 0 10px;
+  }
+
+  #loader-dismiss {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: rgba(255,255,255,0.25);
+    border: 1px solid rgba(255,255,255,0.15);
+    background: transparent;
+    padding: 8px 20px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+    margin-top: 10px;
+    display: none;
+  }
+  #loader-dismiss:hover {
+    color: rgba(255,255,255,0.7);
+    border-color: rgba(255,255,255,0.4);
+  }
+  #loader-dismiss.visible { display: block; }
+
+  /* ── SPINNERS ── */
+  .sp-ring {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: currentColor;
+    animation: spin 0.9s linear infinite;
+  }
+  .sp-ring-dual {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.12);
+    border-top-color: currentColor;
+    border-bottom-color: currentColor;
+    animation: spin 1.1s linear infinite;
+  }
+  .sp-dots {
+    display: flex; gap: 8px;
+  }
+  .sp-dots span {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: bounce 1.2s ease-in-out infinite;
+  }
+  .sp-dots span:nth-child(2) { animation-delay: 0.2s; }
+  .sp-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+  .sp-bars {
+    display: flex; gap: 5px; align-items: flex-end; height: 36px;
+  }
+  .sp-bars span {
+    width: 5px; background: currentColor;
+    border-radius: 2px;
+    animation: bars 1s ease-in-out infinite;
+  }
+  .sp-bars span:nth-child(1) { animation-delay: 0s; }
+  .sp-bars span:nth-child(2) { animation-delay: 0.15s; }
+  .sp-bars span:nth-child(3) { animation-delay: 0.3s; }
+  .sp-bars span:nth-child(4) { animation-delay: 0.45s; }
+  .sp-bars span:nth-child(5) { animation-delay: 0.6s; }
+
+  .sp-chase {
+    width: 52px; height: 52px;
+    position: relative;
+  }
+  .sp-chase-dot {
+    width: 100%; height: 100%;
+    position: absolute; top: 0; left: 0;
+    animation: rotate 2s linear infinite;
+  }
+  .sp-chase-dot::before {
+    content: '';
+    display: block;
+    width: 28%;
+    height: 28%;
+    border-radius: 50%;
+    background: currentColor;
+  }
+  .sp-chase-dot:nth-child(2) { animation-delay: -1.5s; }
+  .sp-chase-dot:nth-child(3) { animation-delay: -1s; }
+  .sp-chase-dot:nth-child(4) { animation-delay: -0.5s; }
+
+  .sp-ripple {
+    width: 52px; height: 52px;
+    position: relative;
+  }
+  .sp-ripple div {
+    position: absolute; inset: 0;
+    border-radius: 50%;
+    border: 2px solid currentColor;
+    animation: ripple 1.4s cubic-bezier(0,0.2,0.8,1) infinite;
+    opacity: 0;
+  }
+  .sp-ripple div:nth-child(2) { animation-delay: -0.7s; }
+
+  .sp-cube {
+    width: 36px; height: 36px;
+    perspective: 100px;
+    animation: cube-rot 2s linear infinite;
+  }
+  .sp-cube-inner {
+    width: 100%; height: 100%;
+    transform-style: preserve-3d;
+    animation: cube-inner 2s linear infinite;
+    position: relative;
+  }
+  .sp-cube-face {
+    position: absolute; inset: 0;
+    border: 2px solid currentColor;
+    opacity: 0.7;
+  }
+  .sp-cube-face:nth-child(1) { transform: translateZ(18px); }
+  .sp-cube-face:nth-child(2) { transform: rotateY(90deg) translateZ(18px); }
+  .sp-cube-face:nth-child(3) { transform: rotateY(180deg) translateZ(18px); }
+  .sp-cube-face:nth-child(4) { transform: rotateY(-90deg) translateZ(18px); }
+  .sp-cube-face:nth-child(5) { transform: rotateX(90deg) translateZ(18px); }
+  .sp-cube-face:nth-child(6) { transform: rotateX(-90deg) translateZ(18px); }
+
+  .sp-grid {
+    display: grid; grid-template-columns: repeat(3,1fr); gap: 5px;
+  }
+  .sp-grid span {
+    width: 10px; height: 10px;
+    border-radius: 2px;
+    background: currentColor;
+    animation: grid-blink 1.5s ease-in-out infinite;
+  }
+  .sp-grid span:nth-child(1) { animation-delay: 0s; }
+  .sp-grid span:nth-child(2) { animation-delay: 0.1s; }
+  .sp-grid span:nth-child(3) { animation-delay: 0.2s; }
+  .sp-grid span:nth-child(4) { animation-delay: 0.3s; }
+  .sp-grid span:nth-child(5) { animation-delay: 0.4s; }
+  .sp-grid span:nth-child(6) { animation-delay: 0.5s; }
+  .sp-grid span:nth-child(7) { animation-delay: 0.6s; }
+  .sp-grid span:nth-child(8) { animation-delay: 0.7s; }
+  .sp-grid span:nth-child(9) { animation-delay: 0.8s; }
+
+  .sp-orbit {
+    width: 52px; height: 52px;
+    position: relative;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.1);
+  }
+  .sp-orbit::after {
+    content: '';
+    position: absolute;
+    width: 12px; height: 12px;
+    top: -7px; left: 50%; margin-left: -6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+    animation: none;
+  }
+  .sp-orbit { animation: spin 1.2s linear infinite; }
+
+  .sp-dash {
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    border: 3px solid transparent;
+    border-top-color: currentColor;
+    animation: spin 1s cubic-bezier(0.68,-0.55,0.27,1.55) infinite;
+    box-shadow: 0 0 12px currentColor;
+  }
+
+  /* ── KEYFRAMES ── */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes rotate { to { transform: rotate(360deg); } }
+  @keyframes bounce {
+    0%,100% { transform: translateY(0); opacity: 0.6; }
+    50% { transform: translateY(-14px); opacity: 1; }
+  }
+  @keyframes bars {
+    0%,100% { height: 8px; opacity: 0.4; }
+    50% { height: 30px; opacity: 1; }
+  }
+  @keyframes ripple {
+    0% { transform: scale(0); opacity: 0.8; }
+    100% { transform: scale(1); opacity: 0; }
+  }
+  @keyframes cube-inner {
+    0%   { transform: rotateX(0) rotateY(0); }
+    100% { transform: rotateX(360deg) rotateY(360deg); }
+  }
+  @keyframes grid-blink {
+    0%,100% { opacity: 0.15; transform: scale(0.8); }
+    50% { opacity: 1; transform: scale(1); }
+  }
+
+  /* mini versions for cards */
+  .mini .sp-ring, .mini .sp-ring-dual, .mini .sp-dash,
+  .mini .sp-orbit, .mini .sp-ripple, .mini .sp-chase {
+    width: 24px; height: 24px;
+  }
+  .mini .sp-dots span { width: 6px; height: 6px; gap: 5px; }
+  .mini .sp-dots { gap: 5px; }
+  .mini .sp-bars { height: 20px; gap: 3px; }
+  .mini .sp-bars span { width: 3px; }
+  .mini .sp-cube { width: 20px; height: 20px; }
+  .mini .sp-cube-face:nth-child(1) { transform: translateZ(10px); }
+  .mini .sp-cube-face:nth-child(2) { transform: rotateY(90deg) translateZ(10px); }
+  .mini .sp-cube-face:nth-child(3) { transform: rotateY(180deg) translateZ(10px); }
+  .mini .sp-cube-face:nth-child(4) { transform: rotateY(-90deg) translateZ(10px); }
+  .mini .sp-cube-face:nth-child(5) { transform: rotateX(90deg) translateZ(10px); }
+  .mini .sp-cube-face:nth-child(6) { transform: rotateX(-90deg) translateZ(10px); }
+  .mini .sp-grid { gap: 3px; }
+  .mini .sp-grid span { width: 6px; height: 6px; }
+  .mini .sp-orbit { width: 24px; height: 24px; }
+  .mini .sp-orbit::after { width: 7px; height: 7px; top: -4px; margin-left: -3px; }
+
+  .kofi-btn {
+    margin-left: auto;
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #FF5E5B;
+    color: #fff;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.08em;
+    padding: 7px 13px;
+    border-radius: 20px;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: filter 0.2s, transform 0.15s;
+    flex-shrink: 0;
+  }
+  .kofi-btn:hover { filter: brightness(1.15); transform: translateY(-1px); }
+  .kofi-btn svg { flex-shrink: 0; }
+
+  .msg-tag {
+    display: inline-flex; align-items: center; gap: 6px;
+    background: rgba(57,255,20,0.08);
+    border: 1px solid rgba(57,255,20,0.2);
+    border-radius: 3px;
+    padding: 3px 8px;
+    font-size: 11px;
+    color: var(--text);
+    margin: 3px;
+  }
+  .msg-tag .rm-msg {
+    cursor: pointer; color: var(--text-dim);
+    font-size: 13px; line-height: 1;
+  }
+  .msg-tag .rm-msg:hover { color: var(--danger); }
+  #msg-tags { display: flex; flex-wrap: wrap; margin-bottom: 8px; min-height: 10px; }
+
+  .msg-add-row { display: flex; gap: 8px; align-items: center; }
+  .msg-add-row input { margin: 0; flex: 1; }
+  .msg-add-row button {
+    background: rgba(57,255,20,0.15);
+    border: 1px solid rgba(57,255,20,0.3);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 16px;
+    padding: 0 12px;
+    height: 32px;
+    border-radius: 3px;
+    cursor: pointer;
+    flex-shrink: 0;
+    line-height: 1;
+    transition: background 0.2s;
+  }
+  .msg-add-row button:hover { background: rgba(57,255,20,0.25); }
+
+  /* chunky indicator */
+  .chunky-demo {
+    height: 6px; background: var(--border); border-radius: 3px;
+    margin-top: 4px; overflow: hidden;
+    display: flex; gap: 2px;
+  }
+  .chunky-demo-bar {
+    height: 100%; border-radius: 1px;
+    background: var(--accent);
+    opacity: 0.5;
+  }
+  .dimmed { opacity: 0.35; pointer-events: none; }
+</style>
+<body>
+
+<!-- ══ CONFIGURATOR ══ -->
+<div id="configurator">
+  <div class="cfg-header">
+    <div class="dot"></div>
+    <div>
+      <h1>LOADR</h1>
+      <div class="sub">LOADING SCREEN SIMULATOR v1.0</div>
+    </div>
+    <a class="kofi-btn" href="https://ko-fi.com/moosehole" target="_blank" rel="noopener">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M23.881 8.948c-.773-4.085-4.859-4.593-4.859-4.593H.723c-.604 0-.679.798-.679.798s-.082 7.324-.022 11.822c.164 2.424 2.586 2.672 2.586 2.672s8.267-.023 11.966-.049c2.438-.426 2.683-2.566 2.658-3.734 4.352.24 7.422-2.831 6.649-6.916zm-11.062 3.511c-1.246 1.453-4.011 3.976-4.011 3.976s-.121.119-.31.023c-.076-.057-.108-.09-.108-.09-.443-.441-3.368-3.049-4.034-3.954-.709-.965-1.041-2.7-.091-3.71.951-1.01 3.005-1.086 4.363.407 0 0 1.565-1.782 3.468-.963 1.904.82 1.832 3.011.723 4.311zm6.173.478c-.928.116-1.682.028-1.682.028V7.284h1.77s1.971.551 1.971 2.638c0 1.913-.985 2.667-2.059 3.015z"/></svg>
+      Support on Ko-fi
+    </a>
+  </div>
+
+  <div class="cfg-body">
+
+    <!-- TIMING -->
+    <div class="cfg-section">
+      <div class="section-title">⏱ Timing</div>
+      <div class="toggle-row" style="margin-bottom:12px">
+        <label class="toggle"><input type="checkbox" id="infinite-mode"><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Infinite (no progress or %)</span>
+      </div>
+      <label>Duration (seconds)</label>
+      <div class="range-row" id="duration-row">
+        <input type="range" id="duration" min="2" max="60" value="8" step="1">
+        <span class="range-val" id="duration-val">8s</span>
+      </div>
+      <label>Speed variance — Chunkiness</label>
+      <div class="range-row">
+        <input type="range" id="chunky" min="0" max="10" value="3" step="1">
+        <span class="range-val" id="chunky-val">3</span>
+      </div>
+      <div class="chunky-demo" id="chunky-demo"></div>
+    </div>
+
+    <!-- APPEARANCE -->
+    <div class="cfg-section">
+      <div class="section-title">🎨 Appearance</div>
+      <label>Title Text</label>
+      <input type="text" id="title-text" value="LOADING" maxlength="40">
+      <label>Accent Color</label>
+      <div class="color-row" id="color-swatches">
+        <div class="color-swatch active" data-color="#39ff14" style="background:#39ff14" title="Matrix Green"></div>
+        <div class="color-swatch" data-color="#00d4ff" style="background:#00d4ff" title="Cyan"></div>
+        <div class="color-swatch" data-color="#ff6b35" style="background:#ff6b35" title="Ember"></div>
+        <div class="color-swatch" data-color="#c084fc" style="background:#c084fc" title="Violet"></div>
+        <div class="color-swatch" data-color="#fb923c" style="background:#fb923c" title="Amber"></div>
+        <div class="color-swatch" data-color="#f43f5e" style="background:#f43f5e" title="Rose"></div>
+        <div class="color-swatch" data-color="#ffffff" style="background:#ffffff" title="White"></div>
+        <div class="color-swatch" data-color="#facc15" style="background:#facc15" title="Gold"></div>
+      </div>
+      <label>Background Style</label>
+      <select id="bg-style">
+        <option value="solid">Solid Color</option>
+        <option value="grid">Grid Lines</option>
+        <option value="scanlines">Scanlines</option>
+        <option value="gradient">Gradient Vignette</option>
+        <option value="image">Slideshow Images</option>
+      </select>
+      <label>Background Color</label>
+      <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px">
+        <input type="color" id="bg-color" value="#000000" style="width:36px;height:28px;padding:2px;border:1px solid var(--border);background:var(--input-bg);border-radius:3px;cursor:pointer;flex-shrink:0">
+        <div class="color-row" id="bg-presets" style="margin:0;flex-wrap:wrap;gap:6px">
+          <div class="color-swatch active" data-color="#000000" style="background:#000000" title="Black"></div>
+          <div class="color-swatch" data-color="#0a0a1a" style="background:#0a0a1a" title="Deep Navy"></div>
+          <div class="color-swatch" data-color="#0d1117" style="background:#0d1117" title="GitHub Dark"></div>
+          <div class="color-swatch" data-color="#1a0a0a" style="background:#1a0a0a" title="Deep Red"></div>
+          <div class="color-swatch" data-color="#0a1a0a" style="background:#0a1a0a" title="Deep Green"></div>
+          <div class="color-swatch" data-color="#1a1a2e" style="background:#1a1a2e" title="Midnight Blue"></div>
+          <div class="color-swatch" data-color="#2d1b69" style="background:#2d1b69" title="Deep Purple"></div>
+          <div class="color-swatch" data-color="#ffffff" style="background:#ffffff;border:1px solid #444" title="White"></div>
+        </div>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="show-percent" checked><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Show percentage</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="show-bar" checked><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Show progress bar</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="show-spinner" checked><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Show spinner</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle"><input type="checkbox" id="glitch-effect"><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Glitch effect</span>
+      </div>
+    </div>
+
+    <!-- SPINNER TYPE -->
+    <div class="cfg-section">
+      <div class="section-title">⟳ Spinner Type</div>
+      <div class="spinner-grid" id="spinner-grid"></div>
+    </div>
+
+    <!-- MESSAGES -->
+    <div class="cfg-section">
+      <div class="section-title">💬 Status Messages</div>
+      <div id="msg-tags"></div>
+      <div class="msg-add-row">
+        <input type="text" id="msg-input" placeholder="Type a message and press +" maxlength="80">
+        <button id="msg-add-btn">+</button>
+      </div>
+      <div class="toggle-row" style="margin-top:10px">
+        <label class="toggle"><input type="checkbox" id="shuffle-msgs" checked><span class="toggle-slider"></span></label>
+        <span class="toggle-label">Rotate messages during load</span>
+      </div>
+    </div>
+
+    <!-- IMAGES -->
+    <div class="cfg-section">
+      <div class="section-title">🖼 Slideshow Images</div>
+      <div class="img-list" id="img-list"></div>
+      <div class="drop-zone" id="drop-zone">
+        Click or drag images here
+      </div>
+      <input type="file" class="file-input-hidden" id="file-input" accept="image/*" multiple>
+      <label>Slide interval (seconds)</label>
+      <div class="range-row">
+        <input type="range" id="slide-interval" min="1" max="10" value="3" step="1">
+        <span class="range-val" id="slide-val">3s</span>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="cfg-footer">
+    <button class="btn btn-primary" id="launch-btn">▶ LAUNCH SIMULATION</button>
+    <button class="btn btn-ghost" id="reset-btn">RESET</button>
+  </div>
+</div>
+
+<!-- ══ LOADING SCREEN ══ -->
+<div id="loader">
+  <div id="loader-bg"></div>
+  <div id="loader-bg-image"></div>
+  <div id="loader-bg-image2"></div>
+  <div id="loader-bg-overlay"></div>
+  <div id="loader-noise"></div>
+
+  <div id="loader-content">
+    <div id="loader-title"></div>
+    <div id="spinner-container"></div>
+    <div id="progress-track" style="display:none">
+      <div id="progress-bar"></div>
+    </div>
+    <div id="progress-label"></div>
+    <div id="status-message"></div>
+    <button id="loader-dismiss">◀ BACK TO CONFIG</button>
+  </div>
+</div>
+
+<style>
+  /* BG STYLES — color applied via JS, these add patterns */
+  .bg-grid {
+    background-image:
+      linear-gradient(rgba(255,255,255,0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.12) 1px, transparent 1px);
+    background-size: 40px 40px;
+  }
+  .bg-scanlines {
+    background-image: repeating-linear-gradient(
+      0deg,
+      rgba(0,0,0,0.55) 0px, rgba(0,0,0,0.55) 1px,
+      transparent 1px, transparent 3px
+    );
+  }
+  .bg-gradient-overlay {
+    background-image: radial-gradient(ellipse at center, transparent 20%, rgba(0,0,0,0.85) 100%);
+  }
+
+  @keyframes glitch1 {
+    0%,100%{clip-path:inset(0 0 95% 0);transform:translateX(-4px)}
+    25%{clip-path:inset(40% 0 50% 0);transform:translateX(4px)}
+    50%{clip-path:inset(20% 0 70% 0);transform:translateX(-2px)}
+    75%{clip-path:inset(60% 0 30% 0);transform:translateX(3px)}
+  }
+  @keyframes glitch2 {
+    0%,100%{clip-path:inset(80% 0 0 0);transform:translateX(3px)}
+    33%{clip-path:inset(10% 0 85% 0);transform:translateX(-3px)}
+    66%{clip-path:inset(50% 0 40% 0);transform:translateX(2px)}
+  }
+  .glitch-wrap { position: relative; }
+  .glitch-wrap::before, .glitch-wrap::after {
+    content: attr(data-text);
+    position: absolute; inset: 0;
+    font-family: inherit; font-size: inherit;
+    font-weight: inherit; letter-spacing: inherit;
+    text-align: center;
+  }
+  .glitch-wrap::before {
+    color: #ff0040;
+    animation: glitch1 3s infinite linear;
+    opacity: 0.7;
+  }
+  .glitch-wrap::after {
+    color: #00d4ff;
+    animation: glitch2 2.5s infinite linear;
+    opacity: 0.7;
+  }
+</style>
+
+<script>
+// ── SPINNER DEFINITIONS ──
+const SPINNERS = [
+  {
+    id: 'ring', name: 'Ring',
+    html: () => `<div class="sp-ring"></div>`
+  },
+  {
+    id: 'ring-dual', name: 'Dual Ring',
+    html: () => `<div class="sp-ring-dual"></div>`
+  },
+  {
+    id: 'dash', name: 'Neon Dash',
+    html: () => `<div class="sp-dash"></div>`
+  },
+  {
+    id: 'dots', name: 'Bouncing Dots',
+    html: () => `<div class="sp-dots"><span></span><span></span><span></span></div>`
+  },
+  {
+    id: 'bars', name: 'EQ Bars',
+    html: () => `<div class="sp-bars"><span></span><span></span><span></span><span></span><span></span></div>`
+  },
+  {
+    id: 'chase', name: 'Chase',
+    html: () => `<div class="sp-chase">
+      <div class="sp-chase-dot"></div><div class="sp-chase-dot"></div>
+      <div class="sp-chase-dot"></div><div class="sp-chase-dot"></div>
+    </div>`
+  },
+  {
+    id: 'ripple', name: 'Ripple',
+    html: () => `<div class="sp-ripple"><div></div><div></div></div>`
+  },
+  {
+    id: 'cube', name: '3D Cube',
+    html: () => `<div class="sp-cube"><div class="sp-cube-inner">
+      <div class="sp-cube-face"></div><div class="sp-cube-face"></div>
+      <div class="sp-cube-face"></div><div class="sp-cube-face"></div>
+      <div class="sp-cube-face"></div><div class="sp-cube-face"></div>
+    </div></div>`
+  },
+  {
+    id: 'grid', name: 'Grid Blink',
+    html: () => `<div class="sp-grid">
+      ${Array(9).fill('<span></span>').join('')}
+    </div>`
+  },
+  {
+    id: 'orbit', name: 'Orbit',
+    html: () => `<div class="sp-orbit"></div>`
+  },
+];
+
+// ── STATE ──
+let selectedSpinner = 'ring';
+let selectedColor = '#39ff14';
+let messages = [
+  'Initializing core systems...',
+  'Loading assets...',
+  'Compiling shaders...',
+  'Establishing connection...',
+  'Preparing environment...',
+];
+let images = [];
+let loaderTimer = null;
+let messageTimer = null;
+let slideTimer = null;
+let currentImageIndex = 0;
+
+// ── INIT SPINNER GRID ──
+function initSpinnerGrid() {
+  const grid = document.getElementById('spinner-grid');
+  grid.innerHTML = '';
+  SPINNERS.forEach(sp => {
+    const card = document.createElement('div');
+    card.className = 'spinner-card' + (sp.id === selectedSpinner ? ' selected' : '');
+    card.dataset.id = sp.id;
+    card.innerHTML = `<div class="mini-sp mini">${sp.html()}</div><div class="sp-name">${sp.name}</div>`;
+    card.style.color = selectedColor;
+    card.addEventListener('click', () => {
+      selectedSpinner = sp.id;
+      document.querySelectorAll('.spinner-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+    });
+    grid.appendChild(card);
+  });
+}
+
+// ── RANGES ──
+function linkRange(id, valId, suffix) {
+  const el = document.getElementById(id);
+  const val = document.getElementById(valId);
+  el.addEventListener('input', () => { val.textContent = el.value + suffix; });
+}
+linkRange('duration', 'duration-val', 's');
+linkRange('slide-interval', 'slide-val', 's');
+
+// ── INFINITE MODE TOGGLE ──
+document.getElementById('infinite-mode').addEventListener('change', function() {
+  const durationRow = document.getElementById('duration-row');
+  const durationLabel = durationRow.previousElementSibling;
+  const dimmed = this.checked;
+  durationRow.classList.toggle('dimmed', dimmed);
+  durationLabel.classList.toggle('dimmed', dimmed);
+});
+
+document.getElementById('chunky').addEventListener('input', function() {
+  document.getElementById('chunky-val').textContent = this.value;
+  updateChunkyDemo();
+});
+
+function updateChunkyDemo() {
+  const v = parseInt(document.getElementById('chunky').value);
+  const demo = document.getElementById('chunky-demo');
+  demo.innerHTML = '';
+  if (v === 0) {
+    const b = document.createElement('div');
+    b.className = 'chunky-demo-bar';
+    b.style.width = '100%';
+    demo.appendChild(b);
+    return;
+  }
+  const numChunks = Math.max(3, 12 - v);
+  for (let i = 0; i < numChunks; i++) {
+    const b = document.createElement('div');
+    b.className = 'chunky-demo-bar';
+    b.style.width = (100 / numChunks - 1) + '%';
+    b.style.opacity = 0.3 + Math.random() * 0.5;
+    demo.appendChild(b);
+  }
+}
+updateChunkyDemo();
+
+// ── COLOR SWATCHES ──
+document.getElementById('color-swatches').addEventListener('click', e => {
+  const swatch = e.target.closest('.color-swatch');
+  if (!swatch) return;
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active'));
+  swatch.classList.add('active');
+  selectedColor = swatch.dataset.color;
+  document.querySelectorAll('.spinner-card').forEach(c => c.style.color = selectedColor);
+});
+
+// ── MESSAGES ──
+function renderMsgTags() {
+  const container = document.getElementById('msg-tags');
+  container.innerHTML = '';
+  messages.forEach((msg, i) => {
+    const tag = document.createElement('span');
+    tag.className = 'msg-tag';
+    tag.innerHTML = `${msg} <span class="rm-msg" data-i="${i}" title="Remove">×</span>`;
+    container.appendChild(tag);
+  });
+  container.addEventListener('click', e => {
+    if (e.target.classList.contains('rm-msg')) {
+      messages.splice(parseInt(e.target.dataset.i), 1);
+      renderMsgTags();
+    }
+  });
+}
+renderMsgTags();
+
+document.getElementById('msg-add-btn').addEventListener('click', addMessage);
+document.getElementById('msg-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addMessage();
+});
+function addMessage() {
+  const inp = document.getElementById('msg-input');
+  const v = inp.value.trim();
+  if (!v) return;
+  messages.push(v);
+  renderMsgTags();
+  inp.value = '';
+}
+
+// ── IMAGE UPLOAD ──
+const dropZone = document.getElementById('drop-zone');
+const fileInput = document.getElementById('file-input');
+
+dropZone.addEventListener('click', () => fileInput.click());
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('dragover'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault(); dropZone.classList.remove('dragover');
+  handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => handleFiles(e.target.files));
+
+function handleFiles(files) {
+  Array.from(files).forEach(f => {
+    if (!f.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      images.push(ev.target.result);
+      renderImageList();
+    };
+    reader.readAsDataURL(f);
+  });
+}
+
+function renderImageList() {
+  const list = document.getElementById('img-list');
+  list.innerHTML = '';
+  images.forEach((src, i) => {
+    const wrap = document.createElement('div');
+    wrap.className = 'img-thumb-wrap';
+    wrap.innerHTML = `<img src="${src}" class="img-thumb"><span class="rm" data-i="${i}">×</span>`;
+    wrap.querySelector('.rm').addEventListener('click', () => {
+      images.splice(i, 1);
+      renderImageList();
+    });
+    list.appendChild(wrap);
+  });
+}
+
+// ── INFINITE MODE TOGGLE ──
+function updateInfiniteUI() {
+  const on = document.getElementById('infinite-mode').checked;
+  document.getElementById('duration-row').classList.toggle('dimmed', on);
+  document.getElementById('show-percent').closest('.toggle-row').classList.toggle('dimmed', on);
+  document.getElementById('show-bar').closest('.toggle-row').classList.toggle('dimmed', on);
+}
+document.getElementById('infinite-mode').addEventListener('change', updateInfiniteUI);
+updateInfiniteUI();
+
+// ── BG COLOR PRESETS ──
+document.getElementById('bg-presets').addEventListener('click', e => {
+  const swatch = e.target.closest('.color-swatch');
+  if (!swatch) return;
+  document.querySelectorAll('#bg-presets .color-swatch').forEach(s => s.classList.remove('active'));
+  swatch.classList.add('active');
+  document.getElementById('bg-color').value = swatch.dataset.color;
+});
+document.getElementById('bg-color').addEventListener('input', function() {
+  document.querySelectorAll('#bg-presets .color-swatch').forEach(s => s.classList.remove('active'));
+});
+
+// ── BG STYLE ──
+document.getElementById('bg-style').addEventListener('change', function() {
+  if (this.value === 'image') {
+    document.getElementById('drop-zone').scrollIntoView({behavior:'smooth', block:'nearest'});
+  }
+});
+
+// ── LAUNCH ──
+document.getElementById('launch-btn').addEventListener('click', launchLoader);
+document.getElementById('reset-btn').addEventListener('click', resetConfig);
+document.getElementById('loader-dismiss').addEventListener('click', stopLoader);
+
+function launchLoader() {
+  const cfg = getConfig();
+  applyConfig(cfg);
+  document.getElementById('configurator').classList.add('hidden');
+  const loader = document.getElementById('loader');
+  loader.classList.add('active');
+  runLoader(cfg);
+}
+
+function getConfig() {
+  const infinite = document.getElementById('infinite-mode').checked;
+  return {
+    duration: parseInt(document.getElementById('duration').value) * 1000,
+    infinite,
+    chunky: parseInt(document.getElementById('chunky').value),
+    title: document.getElementById('title-text').value || 'LOADING',
+    showPercent: infinite ? false : document.getElementById('show-percent').checked,
+    showBar: infinite ? false : document.getElementById('show-bar').checked,
+    showSpinner: document.getElementById('show-spinner').checked,
+    glitch: document.getElementById('glitch-effect').checked,
+    spinner: selectedSpinner,
+    color: selectedColor,
+    bgStyle: document.getElementById('bg-style').value,
+    bgColor: document.getElementById('bg-color').value,
+    messages: [...messages],
+    shuffleMsgs: document.getElementById('shuffle-msgs').checked,
+    images: [...images],
+    slideInterval: parseInt(document.getElementById('slide-interval').value) * 1000,
+  };
+}
+
+function applyConfig(cfg) {
+  const loaderBg = document.getElementById('loader-bg');
+
+  // Background: set base color, add pattern class
+  loaderBg.className = '';
+  loaderBg.style.cssText = ''; // clear all inline styles
+  loaderBg.style.backgroundColor = cfg.bgColor;
+  if (cfg.bgStyle === 'grid') {
+    loaderBg.classList.add('bg-grid');
+  } else if (cfg.bgStyle === 'scanlines') {
+    loaderBg.classList.add('bg-scanlines');
+  } else if (cfg.bgStyle === 'gradient') {
+    loaderBg.classList.add('bg-gradient-overlay');
+  }
+
+  // Title
+  const titleEl = document.getElementById('loader-title');
+  titleEl.style.color = cfg.color;
+  titleEl.style.textShadow = `0 0 30px ${cfg.color}66, 0 0 60px ${cfg.color}33`;
+  if (cfg.glitch) {
+    titleEl.innerHTML = `<div class="glitch-wrap" data-text="${cfg.title}">${cfg.title}</div>`;
+  } else {
+    titleEl.textContent = cfg.title;
+  }
+
+  // Progress bar
+  const bar = document.getElementById('progress-bar');
+  bar.style.background = cfg.color;
+  bar.style.boxShadow = `0 0 12px ${cfg.color}88`;
+  const track = document.getElementById('progress-track');
+  track.style.display = cfg.showBar ? 'block' : 'none';
+
+  // Progress label
+  const pct = document.getElementById('progress-label');
+  pct.style.color = cfg.color;
+  pct.style.display = cfg.showPercent ? 'block' : 'none';
+
+  // Status message color
+  document.getElementById('status-message').style.color = cfg.color;
+
+  // Spinner
+  const sc = document.getElementById('spinner-container');
+  sc.style.color = cfg.color;
+  if (cfg.showSpinner) {
+    const sp = SPINNERS.find(s => s.id === cfg.spinner) || SPINNERS[0];
+    sc.innerHTML = sp.html();
+  } else {
+    sc.innerHTML = '';
+  }
+}
+
+function runLoader(cfg) {
+  let progress = 0;
+  const startTime = Date.now();
+  const bar = document.getElementById('progress-bar');
+  const pct = document.getElementById('progress-label');
+  const msgEl = document.getElementById('status-message');
+  const dismiss = document.getElementById('loader-dismiss');
+
+  // Image slideshow — dual layer crossfade
+  const layer1 = document.getElementById('loader-bg-image');
+  const layer2 = document.getElementById('loader-bg-image2');
+  layer1.style.opacity = '0';
+  layer2.style.opacity = '0';
+  layer1.style.backgroundImage = '';
+  layer2.style.backgroundImage = '';
+
+  if (cfg.bgStyle === 'image' && cfg.images.length > 0) {
+    currentImageIndex = 0;
+    let activeLayer = layer1;
+    let inactiveLayer = layer2;
+    activeLayer.style.backgroundImage = `url(${cfg.images[0]})`;
+    activeLayer.style.zIndex = '2';
+    inactiveLayer.style.zIndex = '1';
+    requestAnimationFrame(() => { activeLayer.style.opacity = '1'; });
+
+    if (cfg.images.length > 1) {
+      slideTimer = setInterval(() => {
+        currentImageIndex = (currentImageIndex + 1) % cfg.images.length;
+        inactiveLayer.style.backgroundImage = `url(${cfg.images[currentImageIndex]})`;
+        inactiveLayer.style.zIndex = '2';
+        activeLayer.style.zIndex = '1';
+        inactiveLayer.style.opacity = '1';
+        activeLayer.style.opacity = '0';
+        [activeLayer, inactiveLayer] = [inactiveLayer, activeLayer];
+      }, cfg.slideInterval);
+    }
+  }
+
+  // Messages
+  const msgs = cfg.messages.length > 0 ? cfg.messages : ['Loading...'];
+  let msgIndex = 0;
+  msgEl.textContent = msgs[msgIndex];
+  if (cfg.shuffleMsgs && msgs.length > 1) {
+    const msgInterval = cfg.infinite
+      ? Math.max(1500, cfg.slideInterval || 3000)
+      : Math.max(1200, cfg.duration / msgs.length);
+    messageTimer = setInterval(() => {
+      msgEl.style.opacity = '0';
+      setTimeout(() => {
+        msgIndex = (msgIndex + 1) % msgs.length;
+        msgEl.textContent = msgs[msgIndex];
+        msgEl.style.opacity = '1';
+      }, 300);
+    }, msgInterval);
+  }
+
+  // ── INFINITE MODE: no progress, no dismiss button ──
+  if (cfg.infinite) {
+    return;
+  }
+
+  // ── TIMED MODE: chunky progress engine ──
+  const chunky = cfg.chunky;
+  let pauseUntil = 0;
+
+  function tick() {
+    const now = Date.now();
+    const elapsed = now - startTime;
+    const baseProgress = Math.min(elapsed / cfg.duration, 1);
+
+    if (chunky === 0) {
+      progress = baseProgress * 100;
+    } else {
+      if (now < pauseUntil) {
+        // stalling
+      } else {
+        const stallChance = chunky * 0.06;
+        if (Math.random() < stallChance && progress < 95) {
+          pauseUntil = now + chunky * (200 + Math.random() * 600);
+        } else {
+          const burstSize = chunky * (0.3 + Math.random() * 1.2);
+          progress = Math.min(progress + burstSize, baseProgress * 100, 99.9);
+        }
+      }
+    }
+
+    if (elapsed >= cfg.duration) progress = 100;
+
+    bar.style.width = progress.toFixed(1) + '%';
+    pct.textContent = Math.floor(progress) + '%';
+
+    if (progress < 100) {
+      loaderTimer = requestAnimationFrame(tick);
+    } else {
+      bar.style.width = '100%';
+      pct.textContent = '100%';
+      msgEl.textContent = '✓ Complete';
+      setTimeout(() => { dismiss.classList.add('visible'); }, 500);
+    }
+  }
+
+  loaderTimer = requestAnimationFrame(tick);
+}
+
+function stopLoader() {
+  if (loaderTimer) { cancelAnimationFrame(loaderTimer); loaderTimer = null; }
+  if (messageTimer) { clearInterval(messageTimer); messageTimer = null; }
+  if (slideTimer) { clearInterval(slideTimer); slideTimer = null; }
+
+  const loader = document.getElementById('loader');
+  loader.classList.remove('active');
+  document.getElementById('loader-dismiss').classList.remove('visible');
+  document.getElementById('progress-bar').style.width = '0%';
+  document.getElementById('loader-bg-image').style.opacity = '0';
+  document.getElementById('loader-bg-image').style.backgroundImage = '';
+  document.getElementById('loader-bg-image2').style.opacity = '0';
+  document.getElementById('loader-bg-image2').style.backgroundImage = '';
+  document.getElementById('configurator').classList.remove('hidden');
+}
+
+function resetConfig() {
+  document.getElementById('infinite-mode').checked = false;
+  updateInfiniteUI();
+  document.getElementById('duration').value = 8;
+  document.getElementById('duration-val').textContent = '8s';
+  document.getElementById('chunky').value = 3;
+  document.getElementById('chunky-val').textContent = '3';
+  document.getElementById('title-text').value = 'LOADING';
+  document.getElementById('show-percent').checked = true;
+  document.getElementById('show-bar').checked = true;
+  document.getElementById('show-spinner').checked = true;
+  document.getElementById('glitch-effect').checked = false;
+  document.getElementById('bg-style').value = 'solid';
+  document.getElementById('bg-color').value = '#000000';
+  document.querySelectorAll('#bg-presets .color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === '#000000'));
+  document.getElementById('shuffle-msgs').checked = true;
+  selectedSpinner = 'ring';
+  selectedColor = '#39ff14';
+  document.querySelectorAll('.color-swatch').forEach(s => s.classList.toggle('active', s.dataset.color === '#39ff14'));
+  messages = [
+    'Initializing core systems...',
+    'Loading assets...',
+    'Compiling shaders...',
+    'Establishing connection...',
+    'Preparing environment...',
+  ];
+  images = [];
+  renderMsgTags();
+  renderImageList();
+  initSpinnerGrid();
+  updateChunkyDemo();
+}
+
+// ── INIT ──
+initSpinnerGrid();
+</script>
+</body>
+</html>
